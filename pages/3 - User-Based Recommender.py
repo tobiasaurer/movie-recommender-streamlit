@@ -3,13 +3,17 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 
 # DATA:
-movies = pd.read_csv('https://raw.githubusercontent.com/tobiasaurer/recommender-systems/main/movie_data/movies.csv')
-ratings = pd.read_csv('https://raw.githubusercontent.com/tobiasaurer/recommender-systems/main/movie_data/ratings.csv')
+movies = pd.read_csv('https://raw.githubusercontent.com/tobiasaurer/movie-recommender-streamlit/main/data/movies.csv')
+ratings = pd.read_csv('https://raw.githubusercontent.com/tobiasaurer/movie-recommender-streamlit/main/data/ratings.csv')
+links = pd.read_csv('https://raw.githubusercontent.com/tobiasaurer/movie-recommender-streamlit/main/data/links.csv')
 
-# clean titles column by moving "The" to the beginning of the string
-# # this makes it more searchable for users
+# clean titles column by moving "The" and "A" to the beginning of the string
+# this makes it more searchable for users
 movies.loc[lambda df: df["title"].str.contains(", The", regex=True), 'title'] = 'The ' + movies['title']
 movies.loc[lambda df: df["title"].str.contains(", The", regex=True), 'title'] = movies['title'].str.replace(", The", '', regex=True)
+
+movies.loc[lambda df: df["title"].str.contains(", A", regex=True), 'title'] = 'A ' + movies['title']
+movies.loc[lambda df: df["title"].str.contains(", A", regex=True), 'title'] = movies['title'].str.replace(", A", '', regex=True)
 
 # create "database" to use for recommendations
 user_item_matrix = (

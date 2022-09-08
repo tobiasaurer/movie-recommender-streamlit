@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
 import re
 import requests
 import api_keys
@@ -17,44 +18,60 @@ movies.loc[lambda df: df["title"].str.contains(", The", regex=True), 'title'] = 
 movies.loc[lambda df: df["title"].str.contains(", A", regex=True), 'title'] = 'A ' + movies['title']
 movies.loc[lambda df: df["title"].str.contains(", A", regex=True), 'title'] = movies['title'].str.replace(", A", '', regex=True)
 
-# INSTRUCTIONS:
-st.title("Popularity-Based Recommender")
+# create "database" to use for recommendations
+movie_user_matrix = (
+                ratings
+                    .merge(movies, on='movieId')[['title', 'rating', 'userId']]
+                    .pivot_table(index='title', columns='userId', values='rating')
+                    .fillna(0)
+                )
+similarities_movies = pd.DataFrame(cosine_similarity(movie_user_matrix),
+                                  index=movie_user_matrix.index,
+                                  columns=movie_user_matrix.index)
+
+# TITLE:
+st.title("User-Based Recommender")
 
 # FUNCTIONS:
 
-def get_popular_recommendations(n, genres):
+def get_similar_recommendations(movie_title, n, genres):
+    
+    # select similarity for chosen movie
+    similarities = pd.DataFrame(
+        (similarities_movies.query("index != @movie_title")[movie_title] / sum(similarities_movies.query("index != @movie_title")[movie_title]))
+        .sort_values(ascending= False))
+ 
+    # exclude genres if necessary and return the n movies with the highest similarity
     recommendations = (
-        ratings
-            .groupby('movieId')
-            .agg(avg_rating = ('rating', 'mean'), num_ratings = ('rating', 'count'))
-            .merge(movies, on='movieId')
-            .assign(combined_rating = lambda x: x['avg_rating'] * x['num_ratings']**0.5)
+        similarities
+            .merge(movies, how= 'left', left_index = True, right_on = 'title')
             [lambda df: df["genres"].str.contains(genres, regex=True)]
-            .sort_values('combined_rating', ascending=False)
             .head(n)
-            [['title', 'avg_rating', 'genres']]
-            .rename(columns= {'title': 'Movie Title', 'avg_rating': 'Average Rating', 'genres': 'Genres'}, inplace = True)
-    )
+            [['title', 'genres']]
+            )
+            
+    recommendations.rename(columns= {'title': 'Movie Title', 'genres': 'Genres'}, inplace = True)
+
     return recommendations
 
-def get_popular_recommendations_streaming(n, genres, country, url, headers):
+def get_similar_recommendations_streaming(movie_title, n, genres, country, url, headers):
+
+    # select similarity for chosen movie
+    similarities = pd.DataFrame(
+        (similarities_movies.query("index != @movie_title")[movie_title] / sum(similarities_movies.query("index != @movie_title")[movie_title]))
+        .sort_values(ascending= False))
+
+    # exclude genres if necessary and return the n movies with the highest similarity
     recommendations = (
-        ratings
-            .groupby('movieId')
-            .agg(avg_rating = ('rating', 'mean'), num_ratings = ('rating', 'count'))
-            .merge(movies, on='movieId')
-            .assign(combined_rating = lambda x: x['avg_rating'] * x['num_ratings']**0.5)
+        similarities
+            .merge(movies, how= 'left', left_index = True, right_on = 'title')
             [lambda df: df["genres"].str.contains(genres, regex=True)]
-            .sort_values('combined_rating', ascending=False)
             .head(n)
-            [['title', 'avg_rating', 'genres', 'movieId']]
-    )
+            [['title', 'genres', 'movieId']]
+            )
+
     # merge recommendations with links df to get imdbIds for the API calls
-    recommendations_ids =   (
-                            recommendations
-                                .merge(links, how = 'left', on = 'movieId')
-                                # [['title', 'genres', 'imdbId']]
-                            )
+    recommendations_ids = recommendations.merge(links, how = 'left', on = 'movieId')[['title', 'genres', 'imdbId']]
     recommendations_ids['imdbId'] = 'tt0' + recommendations_ids['imdbId'].astype('str')
     imdb_ids = list(recommendations_ids['imdbId'])
 
@@ -76,13 +93,33 @@ def get_popular_recommendations_streaming(n, genres, country, url, headers):
 
     return recommendations_ids[['Movie Title', 'Genres', 'Streaming Availability']]
 
+
 def transform_genre_to_regex(genres):
     regex = ""
     for genre in genres:
         regex += f"(?=.*{genre})"
     return regex
 
+def find_movie_title(user_input):
+    title_list = movies.title.unique()
+    
+    r = re.compile(f".*{user_input}.*")
+    result = []
+
+    for title in title_list:
+        match = r.findall(title)
+        if match:
+            result.append(match)
+    
+    return result[0][0]
+
+
 # USER INPUT:
+st.write("""
+Type in the name of your movie.
+""")
+movie_title_raw = st.text_input('Movie Title')
+movie_title = find_movie_title(movie_title_raw)
 
 st.write("""
 Move the slider to the desired number of recommendations you wish to receive.  
@@ -103,6 +140,7 @@ Select none if you don't want to get streaming links.
 """)
 streaming_country = st.selectbox('Optional: Country for streaming information', ('none', 'de', 'us'))
 
+
 # API INFORMATION:
 url = "https://streaming-availability.p.rapidapi.com/get/basic"
 headers = {
@@ -110,11 +148,11 @@ headers = {
 	"X-RapidAPI-Host": "streaming-availability.p.rapidapi.com"
 }
 
-# EXECUTION:
 
+# EXECUTION:
 if st.button("Get Recommendations"):
     if streaming_country == 'none':
-        st.write(get_popular_recommendations(number_of_recommendations, genres_regex))
-    else: 
-        st.write("Double-click on a Streaming-Availability cell to see all options.")
-        st.write(get_popular_recommendations_streaming(number_of_recommendations, genres_regex, streaming_country, url, headers))
+        st.write(get_similar_recommendations(movie_title, number_of_recommendations, genres_regex))
+    else:
+        st.write("Double-click on the Streaming-Availability column to see all links.")
+        st.write(get_similar_recommendations_streaming(movie_title, number_of_recommendations, genres_regex, streaming_country, url, headers))
