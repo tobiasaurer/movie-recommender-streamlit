@@ -33,7 +33,7 @@ def get_popular_recommendations(n, genres):
             .sort_values('combined_rating', ascending=False)
             .head(n)
             [['title', 'avg_rating', 'genres']]
-            .rename(columns= {'title': 'Movie Title', 'avg_rating': 'Average Rating', 'genres': 'Genres'}, inplace = True)
+            .rename(columns= {'title': 'Movie Title', 'avg_rating': 'Average Rating', 'genres': 'Genres'})
     )
     return recommendations
 
