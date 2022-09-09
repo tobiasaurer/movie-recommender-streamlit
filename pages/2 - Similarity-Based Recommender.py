@@ -163,11 +163,11 @@ headers = {
 # EXECUTION:
 if st.button("Get Recommendations"):
     if streaming_country == 'none':
-        st.write(get_similar_recommendations(movie_title, number_of_recommendations, genres_regex))
+        st.write(get_similar_recommendations(movie_title, number_of_recommendations, genres_regex, time_range))
     else:
         try:
-            recommendations = get_similar_recommendations_streaming(movie_title, number_of_recommendations, genres_regex, streaming_country, url, headers)
+            recommendations = get_similar_recommendations_streaming(movie_title, number_of_recommendations, genres_regex, time_range, streaming_country, url, headers)
             st.write("Double-click on a Streaming-Availability cell to see all options.", recommendations)
         except:
-            recommendations = get_similar_recommendations(movie_title, number_of_recommendations, genres_regex)
+            recommendations = get_similar_recommendations(movie_title, number_of_recommendations, genres_regex, time_range)
             st.write('Error: Streaming information could not be gathered. Providing output without streaming availability instead.', recommendations)
