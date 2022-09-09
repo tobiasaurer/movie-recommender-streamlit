@@ -34,7 +34,7 @@ similarities_movies = pd.DataFrame(cosine_similarity(movie_user_matrix),
                                   columns=movie_user_matrix.index)
 
 # TITLE:
-st.title("User-Based Recommender")
+st.title("Movie-Based Recommender")
 
 # FUNCTIONS:
 
