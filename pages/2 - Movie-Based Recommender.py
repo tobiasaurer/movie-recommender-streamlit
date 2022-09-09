@@ -85,6 +85,7 @@ def get_similar_recommendations_streaming(movie_title, n, genres, time_range, co
     recommendations_ids['Streaming Availability'] = ""
 
     # loop through imdb_ids to make one api call for each to get available streaming links
+    successful_calls = 0
     for id in imdb_ids:
 
         # make api call
@@ -95,12 +96,20 @@ def get_similar_recommendations_streaming(movie_title, n, genres, time_range, co
 
             for streaming_service in streaming_info['streamingInfo']:
                 recommendations_ids.loc[recommendations_ids['imdbId'] == id, 'Streaming Availability'] += f"{streaming_service}: {streaming_info['streamingInfo'][streaming_service][country]['link']} \n" 
+
+            successful_calls += 1
         except:
             continue
         
     recommendations_ids.rename(columns= {'title': 'Movie Title', 'genres': 'Genres'}, inplace = True)
 
-    return recommendations_ids[['Movie Title', 'Genres', 'Streaming Availability']]
+    if successful_calls == 0:
+        st.write("Error: Streaming information could not be gathered. Providing output without streaming availability instead.")
+        return recommendations_ids[['Movie Title', 'Genres']]
+    
+    else:
+        st.write("Double-click on a Streaming-Availability cell to see all options.")
+        return recommendations_ids[['Movie Title', 'Genres', 'Streaming Availability']]
 
 
 def transform_genre_to_regex(genres):
@@ -173,7 +182,7 @@ if st.button("Get Recommendations"):
     else:
         try:
             recommendations = get_similar_recommendations_streaming(movie_title, number_of_recommendations, genres_regex, time_range, streaming_country, url, headers)
-            st.write("Double-click on a Streaming-Availability cell to see all options.", recommendations)
+            st.write(recommendations)
         except:
             recommendations = get_similar_recommendations(movie_title, number_of_recommendations, genres_regex, time_range)
             st.write('Error: Streaming information could not be gathered. Providing output without streaming availability instead.', recommendations)
