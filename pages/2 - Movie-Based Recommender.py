@@ -144,7 +144,8 @@ st.write("""
 __Optional__: You can narrow down the recommendations by picking one or several genre(s).  
 However, the more genres you choose, the fewer movies will be recommended.
 """)
-genre_list = set([inner for outer in movies.genres.str.split('|') for inner in outer])
+genre_list = list(set([inner for outer in movies.genres.str.split('|') for inner in outer]))
+genre_list.sort()
 genres = st.multiselect('Optional: Select one or more genres', genre_list, default=None, key=None, help=None, on_change=None, args=None, kwargs=None, disabled=False)
 genres_regex = transform_genre_to_regex(genres)
 
