@@ -88,13 +88,16 @@ def get_similar_recommendations_streaming(movie_title, n, genres, time_range, co
     for id in imdb_ids:
 
         # make api call
-        querystring = {"country":country,"imdb_id":id,"output_language":"en"}
-        response = requests.request("GET", url, headers=headers, params=querystring)
-        streaming_info = response.json()
+        try: 
+            querystring = {"country":country,"imdb_id":id,"output_language":"en"}
+            response = requests.request("GET", url, headers=headers, params=querystring)
+            streaming_info = response.json()
 
-        for streaming_service in streaming_info['streamingInfo']:
-            recommendations_ids.loc[recommendations_ids['imdbId'] == id, 'Streaming Availability'] += f"{streaming_service}: {streaming_info['streamingInfo'][streaming_service][country]['link']} \n" 
-
+            for streaming_service in streaming_info['streamingInfo']:
+                recommendations_ids.loc[recommendations_ids['imdbId'] == id, 'Streaming Availability'] += f"{streaming_service}: {streaming_info['streamingInfo'][streaming_service][country]['link']} \n" 
+        except:
+            continue
+        
     recommendations_ids.rename(columns= {'title': 'Movie Title', 'genres': 'Genres'}, inplace = True)
 
     return recommendations_ids[['Movie Title', 'Genres', 'Streaming Availability']]
