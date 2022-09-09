@@ -17,12 +17,16 @@ movies.loc[lambda df: df["title"].str.contains(", The", regex=True), 'title'] = 
 movies.loc[lambda df: df["title"].str.contains(", A", regex=True), 'title'] = 'A ' + movies['title']
 movies.loc[lambda df: df["title"].str.contains(", A", regex=True), 'title'] = movies['title'].str.replace(", A", '', regex=True)
 
+# extract year from title and store it in new column
+movies= movies.assign(year = lambda df_ : df_['title'].replace(r'(.*)\((\d{4})\)', r'\2', regex= True))
+movies.year = pd.to_numeric(movies.year, errors= 'coerce').fillna(0).astype('int')
+
 # INSTRUCTIONS:
 st.title("Popularity-Based Recommender")
 
 # FUNCTIONS:
 
-def get_popular_recommendations(n, genres):
+def get_popular_recommendations(n, genres, time_range):
     recommendations = (
         ratings
             .groupby('movieId')
@@ -30,6 +34,7 @@ def get_popular_recommendations(n, genres):
             .merge(movies, on='movieId')
             .assign(combined_rating = lambda x: x['avg_rating'] * x['num_ratings']**0.5)
             [lambda df: df["genres"].str.contains(genres, regex=True)]
+            .loc[lambda df : ((df['year'] >= time_range[0]) & ( df['year'] <= time_range[1]))]
             .sort_values('combined_rating', ascending=False)
             .head(n)
             [['title', 'avg_rating', 'genres']]
@@ -37,7 +42,7 @@ def get_popular_recommendations(n, genres):
     )
     return recommendations
 
-def get_popular_recommendations_streaming(n, genres, country, url, headers):
+def get_popular_recommendations_streaming(n, genres, time_range, country, url, headers):
     recommendations = (
         ratings
             .groupby('movieId')
@@ -45,6 +50,7 @@ def get_popular_recommendations_streaming(n, genres, country, url, headers):
             .merge(movies, on='movieId')
             .assign(combined_rating = lambda x: x['avg_rating'] * x['num_ratings']**0.5)
             [lambda df: df["genres"].str.contains(genres, regex=True)]
+            .loc[lambda df : ((df['year'] >= time_range[0]) & ( df['year'] <= time_range[1]))]
             .sort_values('combined_rating', ascending=False)
             .head(n)
             [['title', 'avg_rating', 'genres', 'movieId']]
@@ -90,6 +96,11 @@ Move the slider to the desired number of recommendations you wish to receive.
 number_of_recommendations = st.slider("Number of recommendations", 1, 10, 5)
 
 st.write("""
+Move the sliders to choose a timeperiod for your recommendations.
+""")
+time_range = st.slider('Time-period:', min_value=1900, max_value=2018, value=(1900, 2018), step=1)
+
+st.write("""
 __Optional__: You can narrow down the recommendations by picking one or several genre(s).  
 However, the more genres you choose, the fewer movies will be recommended.
 """)
@@ -104,6 +115,7 @@ Select none if you don't want to get streaming links.
 streaming_country = st.selectbox('Optional: Country for streaming information', ('none', 'de', 'us'))
 
 # API INFORMATION:
+# Streaming availability
 url = "https://streaming-availability.p.rapidapi.com/get/basic"
 headers = {
 	"X-RapidAPI-Key": api_keys.streaming_api_key,
@@ -114,7 +126,11 @@ headers = {
 
 if st.button("Get Recommendations"):
     if streaming_country == 'none':
-        st.write(get_popular_recommendations(number_of_recommendations, genres_regex))
+        st.write(get_popular_recommendations(number_of_recommendations, genres_regex, time_range))
     else: 
-        st.write("Double-click on a Streaming-Availability cell to see all options.")
-        st.write(get_popular_recommendations_streaming(number_of_recommendations, genres_regex, streaming_country, url, headers))
+        try:
+            recommendations = get_popular_recommendations_streaming(number_of_recommendations, genres_regex, time_range, streaming_country, url, headers)
+            st.write("Double-click on a Streaming-Availability cell to see all options.", recommendations)
+        except:
+            recommendations = get_popular_recommendations(number_of_recommendations, genres_regex, time_range)
+            st.write('Error: Streaming information could not be gathered. Providing output without streaming availability instead.', recommendations)

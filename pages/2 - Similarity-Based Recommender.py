@@ -18,6 +18,10 @@ movies.loc[lambda df: df["title"].str.contains(", The", regex=True), 'title'] = 
 movies.loc[lambda df: df["title"].str.contains(", A", regex=True), 'title'] = 'A ' + movies['title']
 movies.loc[lambda df: df["title"].str.contains(", A", regex=True), 'title'] = movies['title'].str.replace(", A", '', regex=True)
 
+# extract year from title and store it in new column
+movies= movies.assign(year = lambda df_ : df_['title'].replace(r'(.*)\((\d{4})\)', r'\2', regex= True))
+movies.year = pd.to_numeric(movies.year, errors= 'coerce').fillna(0).astype('int')
+
 # create "database" to use for recommendations
 movie_user_matrix = (
                 ratings
@@ -34,7 +38,7 @@ st.title("User-Based Recommender")
 
 # FUNCTIONS:
 
-def get_similar_recommendations(movie_title, n, genres):
+def get_similar_recommendations(movie_title, n, genres, time_range):
     
     # select similarity for chosen movie
     similarities = pd.DataFrame(
@@ -46,6 +50,7 @@ def get_similar_recommendations(movie_title, n, genres):
         similarities
             .merge(movies, how= 'left', left_index = True, right_on = 'title')
             [lambda df: df["genres"].str.contains(genres, regex=True)]
+            .loc[lambda df : ((df['year'] >= time_range[0]) & ( df['year'] <= time_range[1]))]
             .head(n)
             [['title', 'genres']]
             )
@@ -54,7 +59,7 @@ def get_similar_recommendations(movie_title, n, genres):
 
     return recommendations
 
-def get_similar_recommendations_streaming(movie_title, n, genres, country, url, headers):
+def get_similar_recommendations_streaming(movie_title, n, genres, time_range, country, url, headers):
 
     # select similarity for chosen movie
     similarities = pd.DataFrame(
@@ -66,6 +71,7 @@ def get_similar_recommendations_streaming(movie_title, n, genres, country, url, 
         similarities
             .merge(movies, how= 'left', left_index = True, right_on = 'title')
             [lambda df: df["genres"].str.contains(genres, regex=True)]
+            .loc[lambda df : ((df['year'] >= time_range[0]) & ( df['year'] <= time_range[1]))]
             .head(n)
             [['title', 'genres', 'movieId']]
             )
@@ -127,6 +133,11 @@ Move the slider to the desired number of recommendations you wish to receive.
 number_of_recommendations = st.slider("Number of recommendations", 1, 10, 5)
 
 st.write("""
+Move the sliders to choose a timeperiod for your recommendations.
+""")
+time_range = st.slider('Time-period:', min_value=1900, max_value=2018, value=(1900, 2018), step=1)
+
+st.write("""
 __Optional__: You can narrow down the recommendations by picking one or several genre(s).  
 However, the more genres you choose, the fewer movies will be recommended.
 """)
@@ -154,5 +165,9 @@ if st.button("Get Recommendations"):
     if streaming_country == 'none':
         st.write(get_similar_recommendations(movie_title, number_of_recommendations, genres_regex))
     else:
-        st.write("Double-click on the Streaming-Availability column to see all links.")
-        st.write(get_similar_recommendations_streaming(movie_title, number_of_recommendations, genres_regex, streaming_country, url, headers))
+        try:
+            recommendations = get_similar_recommendations_streaming(movie_title, number_of_recommendations, genres_regex, streaming_country, url, headers)
+            st.write("Double-click on a Streaming-Availability cell to see all options.", recommendations)
+        except:
+            recommendations = get_similar_recommendations(movie_title, number_of_recommendations, genres_regex)
+            st.write('Error: Streaming information could not be gathered. Providing output without streaming availability instead.', recommendations)
