@@ -119,8 +119,10 @@ def find_movie_title(user_input):
         match = r.findall(title)
         if match:
             result.append(match)
-    
-    return result[0][0]
+    if result == []:
+        return st.write('Error: Your chosen movie is not included in our database. Please pick a different movie. ')
+    else:
+        return result[0][0]
 
 
 # USER INPUT:
